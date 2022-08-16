@@ -61,12 +61,14 @@ function useWatch<ValueType = Store>(dependencies: NamePath, form?: FormInstance
 function useWatch(dependencies: NamePath = [], form?: FormInstance) {
   const [value, setValue] = useState<any>();
 
+  // value 的 str
   const valueStr = useMemo(() => stringify(value), [value]);
   const valueStrRef = useRef(valueStr);
   valueStrRef.current = valueStr;
 
   const fieldContext = useContext(FieldContext);
   const formInstance = (form as InternalFormInstance) || fieldContext;
+  // 查看是否在 Form 内部或传入了 form 实例
   const isValidForm = formInstance && formInstance._init;
 
   // Warning if not exist form instance
@@ -91,21 +93,26 @@ function useWatch(dependencies: NamePath = [], form?: FormInstance) {
       const { getFieldsValue, getInternalHooks } = formInstance;
       const { registerWatch } = getInternalHooks(HOOK_MARK);
 
+      // 设置值监听，当 store 改变时进行值比较
       const cancelRegister = registerWatch(store => {
         const newValue = getValue(store, namePathRef.current);
+        // 通过 str 比较
         const nextValueStr = stringify(newValue);
 
         // Compare stringify in case it's nest object
         if (valueStrRef.current !== nextValueStr) {
           valueStrRef.current = nextValueStr;
+          // 更新 watch 的值
           setValue(newValue);
         }
       });
 
+      // 获取初始值
       // TODO: We can improve this perf in future
       const initialValue = getValue(getFieldsValue(), namePathRef.current);
       setValue(initialValue);
 
+      // clean up
       return cancelRegister;
     },
 

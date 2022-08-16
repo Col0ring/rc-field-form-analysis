@@ -45,25 +45,37 @@ const List: React.FunctionComponent<ListProps> = ({
   });
   const keyManager = keyRef.current;
 
+  // name 默认会传入 prefixName
   const prefixName: InternalNamePath = React.useMemo(() => {
     const parentPrefixName = getNamePath(context.prefixName) || [];
     return [...parentPrefixName, ...getNamePath(name)];
   }, [context.prefixName, name]);
 
+  // 覆盖掉默认 fieldContext 的 prefixName
   const fieldContext = React.useMemo(() => ({ ...context, prefixName }), [context, prefixName]);
 
   // List context
   const listContext = React.useMemo<ListContextProps>(
     () => ({
+      /**
+       * 获取当前 pathName 对应的 id 和当前的 name
+       * @param namePath
+       * @returns
+       */
       getKey: (namePath: InternalNamePath) => {
+        // 前缀长度
         const len = prefixName.length;
+        // 当前的 name，len 前面为前缀的 path name
         const pathName = namePath[len];
+        // 当前 pathName 对应的 id 和当前的 name
         return [keyManager.keys[pathName], namePath.slice(len + 1)];
       },
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [prefixName],
   );
 
+  // 只允许传入 function
   // User should not pass `children` as other type.
   if (typeof children !== 'function') {
     warning(false, 'Form.List only accepts function as children.');
@@ -80,7 +92,9 @@ const List: React.FunctionComponent<ListProps> = ({
   return (
     <ListContext.Provider value={listContext}>
       <FieldContext.Provider value={fieldContext}>
+        {/* List 本质也是一个 Field */}
         <Field
+          // name 为空，基本不会触发任何响应
           name={[]}
           shouldUpdate={shouldUpdate}
           rules={rules}
@@ -90,11 +104,13 @@ const List: React.FunctionComponent<ListProps> = ({
         >
           {({ value = [], onChange }, meta) => {
             const { getFieldValue } = context;
+            // value 默认是一个 []
             const getNewValue = () => {
               const values = getFieldValue(prefixName || []) as StoreValue[];
               return values || [];
             };
             /**
+             * List 相关操作
              * Always get latest value in case user update fields by `form` api.
              */
             const operations: ListOperations = {
@@ -168,9 +184,12 @@ const List: React.FunctionComponent<ListProps> = ({
               }
             }
 
+            // children 是根据 value 的值来渲染的
             return children(
+              // 第一个字段为生成的 field list 对象
               (listValue as StoreValue[]).map((__, index): ListField => {
                 let key = keyManager.keys[index];
+                // 没有 key 就生成 key
                 if (key === undefined) {
                   keyManager.keys[index] = keyManager.id;
                   key = keyManager.keys[index];

@@ -20,6 +20,7 @@ function normalize(namePath: InternalNamePath): string {
 }
 
 /**
+ * 使用 NamePath 作为 key
  * NameMap like a `Map` but accepts `string[]` as key.
  */
 class NameMap<T> {

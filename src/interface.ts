@@ -89,6 +89,9 @@ export interface ValidateErrorEntity<Values = any> {
   outOfDate: boolean;
 }
 
+/**
+ * filed 相关配置
+ */
 export interface FieldEntity {
   onStoreChange: (
     store: Store,
@@ -127,8 +130,10 @@ export interface RuleError {
 
 export interface ValidateOptions {
   triggerName?: string;
+  // 验证相关信息
   validateMessages?: ValidateMessages;
   /**
+   * 递归验证，只有有相关 path 就验证
    * Recursive validate. It will validate all the name path that contains the provided one.
    * e.g. ['a'] will validate ['a'] , ['a', 'b'] and ['a', 1].
    */
@@ -248,6 +253,7 @@ export type InternalFormInstance = Omit<FormInstance, 'validateFields'> & {
   validateFields: InternalValidateFields;
 
   /**
+   * 外部统一传入的 name 前缀
    * Passed by field context props
    */
   prefixName?: InternalNamePath;

@@ -3,6 +3,9 @@ import type { ValidateMessages, FormInstance, FieldData, Store } from './interfa
 
 export type Forms = Record<string, FormInstance>;
 
+/**
+ * form 中改变的 相关 field 信息
+ */
 export interface FormChangeInfo {
   changedFields: FieldData[];
   forms: Forms;
@@ -20,6 +23,9 @@ export interface FormProviderProps {
   children?: React.ReactNode;
 }
 
+/**
+ * 上下文相关回调：name => value 一一对应
+ */
 export interface FormContextProps extends FormProviderProps {
   triggerFormChange: (name: string, changedFields: FieldData[]) => void;
   triggerFormFinish: (name: string, values: Store) => void;
@@ -34,12 +40,18 @@ const FormContext = React.createContext<FormContextProps>({
   unregisterForm: () => {},
 });
 
+/**
+ * 用作外层表单联动，带有 name 子表单的触发时它就会触发
+ * @param param0
+ * @returns
+ */
 const FormProvider: React.FunctionComponent<FormProviderProps> = ({
   validateMessages,
   onFormChange,
   onFormFinish,
   children,
 }) => {
+  // 拿父级的 Provider，回调会进行透传
   const formContext = React.useContext(FormContext);
 
   const formsRef = React.useRef<Forms>({});
@@ -57,6 +69,7 @@ const FormProvider: React.FunctionComponent<FormProviderProps> = ({
         // =                  Global Form Control                  =
         // =========================================================
         triggerFormChange: (name, changedFields) => {
+          // 此 name 是 Form 表单的 name
           if (onFormChange) {
             onFormChange(name, {
               changedFields,
@@ -66,6 +79,7 @@ const FormProvider: React.FunctionComponent<FormProviderProps> = ({
 
           formContext.triggerFormChange(name, changedFields);
         },
+        // 触发 Form 的 Finish 事件
         triggerFormFinish: (name, values) => {
           if (onFormFinish) {
             onFormFinish(name, {
@@ -77,6 +91,7 @@ const FormProvider: React.FunctionComponent<FormProviderProps> = ({
           formContext.triggerFormFinish(name, values);
         },
         registerForm: (name, form) => {
+          // 同步注册所有的 Form
           if (name) {
             formsRef.current = {
               ...formsRef.current,
@@ -86,6 +101,7 @@ const FormProvider: React.FunctionComponent<FormProviderProps> = ({
 
           formContext.registerForm(name, form);
         },
+        // 同步取消注册 Form
         unregisterForm: name => {
           const newForms = { ...formsRef.current };
           delete newForms[name];

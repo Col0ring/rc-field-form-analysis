@@ -5,6 +5,7 @@ import { toArray } from './typeUtil';
 import cloneDeep from '../utils/cloneDeep';
 
 /**
+ * 将非数组的值转换为数组
  * Convert name to internal supported format.
  * This function should keep since we still thinking if need support like `a.b.c` format.
  * 'a' => ['a']
@@ -14,12 +15,25 @@ import cloneDeep from '../utils/cloneDeep';
 export function getNamePath(path: NamePath | null): InternalNamePath {
   return toArray(path);
 }
-
+/**
+ * 获取存储的 field 值
+ * @param store
+ * @param namePath
+ * @returns
+ */
 export function getValue(store: Store, namePath: InternalNamePath) {
   const value = get(store, namePath);
   return value;
 }
 
+/**
+ * 存储 field 值
+ * @param store
+ * @param namePath
+ * @param value
+ * @param removeIfUndefined
+ * @returns
+ */
 export function setValue(
   store: Store,
   namePath: InternalNamePath,
@@ -30,6 +44,12 @@ export function setValue(
   return newStore;
 }
 
+/**
+ * 只获取 namePathList 中相关字段的 store
+ * @param store
+ * @param namePathList
+ * @returns
+ */
 export function cloneByNamePathList(store: Store, namePathList: InternalNamePath[]): Store {
   let newStore = {};
   namePathList.forEach(namePath => {
@@ -49,6 +69,7 @@ function isObject(obj: StoreValue) {
 }
 
 /**
+ * 深合并对象
  * Copy values into store and return a new values object
  * ({ a: 1, b: { c: 2 } }, { a: 4, b: { d: 5 } }) => { a: 4, b: { c: 2, d: 5 } }
  */
@@ -119,6 +140,12 @@ export function isSimilar(source: SimilarObject, target: SimilarObject) {
   });
 }
 
+/**
+ * 默认对表单值的处理，如果是 event 会去拿 target 的值，否则直接拿 event
+ * @param valuePropName
+ * @param args
+ * @returns
+ */
 export function defaultGetValueFromEvent(valuePropName: string, ...args: EventArgs) {
   const event = args[0];
   if (event && event.target && typeof event.target === 'object' && valuePropName in event.target) {

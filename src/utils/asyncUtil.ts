@@ -1,10 +1,14 @@
 import type { FieldError } from '../interface';
 
+/**
+ * Promise.allSettled
+ * @param promiseList
+ * @returns
+ */
 export function allPromiseFinish(promiseList: Promise<FieldError>[]): Promise<FieldError[]> {
   let hasError = false;
   let count = promiseList.length;
   const results: FieldError[] = [];
-
   if (!promiseList.length) {
     return Promise.resolve([]);
   }

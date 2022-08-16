@@ -15,6 +15,7 @@ import { setValues } from './valueUtil';
 const AsyncValidator: any = RawAsyncValidator;
 
 /**
+ * 覆盖默认模板， name 会被改为具体的字段值
  * Replace with template.
  *   `I'm ${name}` + { name: 'bamboo' } = I'm bamboo
  */
@@ -27,6 +28,15 @@ function replaceMessage(template: string, kv: Record<string, string>): string {
 
 const CODE_LOGIC_ERROR = 'CODE_LOGIC_ERROR';
 
+/**
+ * 校验单个字段
+ * @param name
+ * @param value
+ * @param rule
+ * @param options
+ * @param messageVariables
+ * @returns
+ */
 async function validateRule(
   name: string,
   value: StoreValue,
@@ -94,6 +104,7 @@ async function validateRule(
     return subResults.reduce((prev, errors) => [...prev, ...errors], []);
   }
 
+  // 更改变量与值
   // Replace message with variables
   const kv = {
     ...(rule as Record<string, string | number>),
@@ -113,6 +124,7 @@ async function validateRule(
 }
 
 /**
+ * 使用`async-validator`校验字段
  * We use `async-validator` to validate the value.
  * But only check one value in a time to avoid namePath validate issue.
  */
@@ -200,6 +212,7 @@ export function validateRules(
   // Do validate rules
   let summaryPromise: Promise<RuleError[]>;
 
+  // 当
   if (validateFirst === true) {
     // >>>>> Validate by serialization
     summaryPromise = new Promise(async (resolve, reject) => {
@@ -217,17 +230,19 @@ export function validateRules(
       resolve([]);
     });
   } else {
+    // 并行校验
     // >>>>> Validate by parallel
     const rulePromises: Promise<RuleError>[] = filledRules.map(rule =>
       validateRule(name, value, rule, options, messageVariables).then(errors => ({ errors, rule })),
     );
 
-    summaryPromise = (
-      validateFirst ? finishOnFirstFailed(rulePromises) : finishOnAllFailed(rulePromises)
-    ).then((errors: RuleError[]): RuleError[] | Promise<RuleError[]> => {
-      // Always change to rejection for Field to catch
-      return Promise.reject<RuleError[]>(errors);
-    });
+    summaryPromise = // 第一个并行校验出错
+    (validateFirst ? finishOnFirstFailed(rulePromises) : finishOnAllFailed(rulePromises)).then(
+      (errors: RuleError[]): RuleError[] | Promise<RuleError[]> => {
+        // Always change to rejection for Field to catch
+        return Promise.reject<RuleError[]>(errors);
+      },
+    );
   }
 
   // Internal catch error to avoid console error log.

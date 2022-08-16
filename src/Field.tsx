@@ -99,6 +99,9 @@ export interface FieldState {
   resetCount: number;
 }
 
+/**
+ * 用于获取 Form 的上下文
+ */
 // We use Class instead of Hooks here since it will cost much code by using Hooks.
 class Field extends React.Component<InternalFieldProps, FieldState> implements FieldEntity {
   public static contextType = FieldContext;
@@ -129,6 +132,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   /**
    * Mark when touched & validated. Currently only used for `dependencies`.
    * Note that we do not think field with `initialValue` is dirty
+   * isFieldDirty function 会认为是脏的字段，但是本身对 Field 组件来说不代表脏状态
    * but this will be by `isFieldDirty` func.
    */
   private dirty: boolean = false;
@@ -141,10 +145,10 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   private warnings: string[] = EMPTY_ERRORS;
 
   // ============================== Subscriptions ==============================
+  // constructor 内更新初始值
   constructor(props: InternalFieldProps) {
     super(props);
-
-    // Register on init
+    // Register on init 如果 Field 在 Form 内部
     if (props.fieldContext) {
       const { getInternalHooks }: InternalFormInstance = props.fieldContext;
       const { initEntityValue } = getInternalHooks(HOOK_MARK);
@@ -163,7 +167,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
       const { registerField } = getInternalHooks(HOOK_MARK);
       this.cancelRegisterFunc = registerField(this);
     }
-
+    // 如果 shouldUpdate（可以为一个比较函数） 直接为 true 则马上重新渲染
     // One more render for component in case fields not ready
     if (shouldUpdate === true) {
       this.reRender();
@@ -186,6 +190,10 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   };
 
   // ================================== Utils ==================================
+  /**
+   * 这里主要是给 formInstance 使用的
+   * @returns
+   */
   public getNamePath = (): InternalNamePath => {
     const { name, fieldContext } = this.props;
     const { prefixName = [] }: InternalFormInstance = fieldContext;
@@ -209,6 +217,10 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     this.forceUpdate();
   }
 
+  /**
+   * 刷新会改变 Field 渲染的 key，强制更新节点
+   * @returns
+   */
   public refresh = () => {
     if (!this.mounted) return;
 
@@ -219,26 +231,38 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
       resetCount: resetCount + 1,
     }));
   };
-
+  /**
+   * 往外传相关 meta 更新信息
+   * @param destroy
+   */
   public triggerMetaEvent = (destroy?: boolean) => {
     const { onMetaChange } = this.props;
-
+    // Filed 相关 meta 信息修改
     onMetaChange?.({ ...this.getMeta(), destroy });
   };
 
   // ========================= Field Entity Interfaces =========================
   // Trigger by store update. Check if need update the component
+  /**
+   * Form Store 发放通知
+   * @param prevStore
+   * @param namePathList
+   * @param info
+   * @returns
+   */
   public onStoreChange: FieldEntity['onStoreChange'] = (prevStore, namePathList, info) => {
     const { shouldUpdate, dependencies = [], onReset } = this.props;
     const { store } = info;
     const namePath = this.getNamePath();
     const prevValue = this.getValue(prevStore);
     const curValue = this.getValue(store);
-
+    // 修改的值是否和当前的 namePath 匹配
     const namePathMatch = namePathList && containsNamePath(namePathList, namePath);
 
+    // 如果是修改所有值（setFieldsValue）才会触发下面
     // `setFieldsValue` is a quick access to update related status
     if (info.type === 'valueUpdate' && info.source === 'external' && prevValue !== curValue) {
+      // 重置所有状态
       this.touched = true;
       this.dirty = true;
       this.validatePromise = null;
@@ -272,6 +296,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
        * - Reset A, need clean B, C
        */
       case 'remove': {
+        // 有 shouldUpdate 就更新
         if (shouldUpdate) {
           this.reRender();
           return;
@@ -302,10 +327,11 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
           this.reRender();
           return;
         }
-
+        // 如果有 shouldUpdate，setField 时即使没有匹配上也可以 reRender
         // Handle update by `setField` with `shouldUpdate`
         if (
           shouldUpdate &&
+          // 没有 name
           !namePath.length &&
           requireUpdate(shouldUpdate, prevStore, store, prevValue, curValue, info)
         ) {
@@ -315,11 +341,13 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
         break;
       }
 
+      // 依赖更新了
       case 'dependenciesUpdate': {
         /**
          * Trigger when marked `dependencies` updated. Related fields will all update
          */
         const dependencyList = dependencies.map(getNamePath);
+        // 在这之前触发 valueUpdate 时会检测 namePathMath 与 shouldUpdate，所以不在这里检测
         // No need for `namePathMath` check and `shouldUpdate` check, since `valueUpdate` will be
         // emitted earlier and they will work there
         // If set it may cause unnecessary twice rerendering
@@ -330,6 +358,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
         break;
       }
 
+      // validateFinish 完毕后会到这里，更新 Field 状态（但是其实这里没有必要，在之前获取到 errors 就已经判断过了）
       default:
         // 1. If `namePath` exists in `namePathList`, means it's related value and should update
         //      For example <List name="list"><Field name={['list', 0]}></List>
@@ -362,17 +391,20 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     const namePath = this.getNamePath();
     const currentValue = this.getValue();
 
+    //强制改为异步校验
     // Force change to async to avoid rule OOD under renderProps field
     const rootPromise = Promise.resolve().then(() => {
       if (!this.mounted) {
         return [];
       }
 
+      // messageVariables 为用户传入的验证 Message 变量
       const { validateFirst = false, messageVariables } = this.props;
       const { triggerName } = (options || {}) as ValidateOptions;
 
       let filteredRules = this.getRules();
       if (triggerName) {
+        // 过滤不触发的 rule
         filteredRules = filteredRules.filter((rule: RuleObject) => {
           const { validateTrigger } = rule;
           if (!validateTrigger) {
@@ -382,7 +414,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
           return triggerList.includes(triggerName);
         });
       }
-
+      // 验证
       const promise = validateRules(
         namePath,
         currentValue,
@@ -395,6 +427,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
       promise
         .catch(e => e)
         .then((ruleErrors: RuleError[] = EMPTY_ERRORS) => {
+          // 只管最后一个进行中的校验
           if (this.validatePromise === rootPromise) {
             this.validatePromise = null;
 
@@ -420,12 +453,13 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
       return promise;
     });
 
+    // 正在 validating
     this.validatePromise = rootPromise;
     this.dirty = true;
     this.errors = EMPTY_ERRORS;
     this.warnings = EMPTY_ERRORS;
     this.triggerMetaEvent();
-
+    // 新了 meta，这里是为了同步的 renderProps
     // Force trigger re-render since we need sync renderProps with new meta
     this.reRender();
 
@@ -437,6 +471,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   public isFieldTouched = () => this.touched;
 
   public isFieldDirty = () => {
+    // 是否正在运行行为或者本身有 initialValue（不是 Form 上的 initialValues）
     // Touched or validate or has initialValue
     if (this.dirty || this.props.initialValue !== undefined) {
       return true;
@@ -463,8 +498,13 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   public isPreserve = () => this.props.preserve;
 
   // ============================= Child Component =============================
+  /**
+   * 当前 Field 包含的元信息
+   * @returns
+   */
   public getMeta = (): Meta => {
     // Make error & validating in cache to save perf
+    // 是否正在验证字段值
     this.prevValidating = this.isFieldValidating();
 
     const meta: Meta = {
@@ -478,6 +518,11 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     return meta;
   };
 
+  /**
+   * 只获取第一个唯一的 child
+   * @param children
+   * @returns
+   */
   // Only return validate child node. If invalidate, will do nothing about field.
   public getOnlyChild = (
     children:
@@ -504,14 +549,23 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
   };
 
   // ============================== Field Control ==============================
+  // 获取当前的 value 值，从 Form Context 中获取
   public getValue = (store?: Store) => {
     const { getFieldsValue }: FormInstance = this.props.fieldContext;
+    // 当前 filed 对应的 name path
     const namePath = this.getNamePath();
+    // 获取所有的 value 值
     return getValue(store || getFieldsValue(true), namePath);
   };
 
+  /**
+   * 获取控制器，用于回调值加上触发验证器回调
+   * @param childProps
+   * @returns
+   */
   public getControlled = (childProps: ChildProps = {}) => {
     const {
+      // 回调触发方法
       trigger,
       validateTrigger,
       getValueFromEvent,
@@ -520,24 +574,28 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
       getValueProps,
       fieldContext,
     } = this.props;
-
+    // 验证触发条件
     const mergedValidateTrigger =
       validateTrigger !== undefined ? validateTrigger : fieldContext.validateTrigger;
 
     const namePath = this.getNamePath();
     const { getInternalHooks, getFieldsValue }: InternalFormInstance = fieldContext;
     const { dispatch } = getInternalHooks(HOOK_MARK);
+    // 传入 value
     const value = this.getValue();
     const mergedGetValueProps = getValueProps || ((val: StoreValue) => ({ [valuePropName]: val }));
+    // (val) => ({ value: val })
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const originTriggerFunc: any = childProps[trigger];
 
     const control = {
       ...childProps,
+      // 因为 (val) => ({ value: val })，所以直接把 value 拿到
       ...mergedGetValueProps(value),
     };
 
+    // 劫持 onChange 等对上级返回的回调
     // Add trigger
     control[trigger] = (...args: EventArgs) => {
       // Mark as touched
@@ -553,10 +611,12 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
         newValue = defaultGetValueFromEvent(valuePropName, ...args);
       }
 
+      // 格式化值
       if (normalize) {
         newValue = normalize(newValue, value, getFieldsValue(true));
       }
 
+      // 修改值
       dispatch({
         type: 'updateValue',
         namePath,
@@ -571,6 +631,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     // Add validateTrigger
     const validateTriggerList: string[] = toArray(mergedValidateTrigger || []);
 
+    // 调用验证触发
     validateTriggerList.forEach((triggerName: string) => {
       // Wrap additional function of component, so that we can get latest value from store
       const originTrigger = control[triggerName];
@@ -609,6 +670,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     } else if (React.isValidElement(child)) {
       returnChildNode = React.cloneElement(
         child as React.ReactElement,
+        // 代理 props，返回 control，control 会包装 value 与对应 onChange 等
         this.getControlled((child as React.ReactElement).props),
       );
     } else {
@@ -621,8 +683,10 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
 }
 
 function WrapperField<Values = any>({ name, ...restProps }: FieldProps<Values>) {
+  // 获取 fieldContext
   const fieldContext = React.useContext(FieldContext);
 
+  // 格式化 name path
   const namePath = name !== undefined ? getNamePath(name) : undefined;
 
   let key: string = 'keep';

@@ -9,6 +9,9 @@ const warningFunc: any = () => {
   warning(false, 'Can not find FormContext. Please make sure you wrap Field under Form.');
 };
 
+/**
+ * 用作表单项的数据设置
+ */
 const Context = React.createContext<InternalFormInstance>({
   getFieldValue: warningFunc,
   getFieldsValue: warningFunc,
@@ -26,6 +29,10 @@ const Context = React.createContext<InternalFormInstance>({
   validateFields: warningFunc,
   submit: warningFunc,
 
+  /**
+   * 默认不能调用，需要 Context 包裹，这里是为了让外部覆盖 getInternalHooks
+   * @returns
+   */
   getInternalHooks: () => {
     warningFunc();
 
