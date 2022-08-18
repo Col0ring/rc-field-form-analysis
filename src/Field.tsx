@@ -110,7 +110,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
     trigger: 'onChange',
     valuePropName: 'value',
   };
-
+  // 内部的 state 是没有 value 的，通过 FormStore 改变值后发送通知，最终在 Field 中强制渲染更新
   public state = {
     resetCount: 0,
   };
@@ -358,7 +358,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
         break;
       }
 
-      // validateFinish 完毕后会到这里，更新 Field 状态（但是其实这里没有必要，在之前获取到 errors 就已经判断过了）
+      // validateFinish 完毕后会到这里，更新 Field 状态（但是其实这里没有必要，在之前获取到 errors 就已经判断过了）,值更新了也会到这里 valueUpdate
       default:
         // 1. If `namePath` exists in `namePathList`, means it's related value and should update
         //      For example <List name="list"><Field name={['list', 0]}></List>
@@ -616,7 +616,7 @@ class Field extends React.Component<InternalFieldProps, FieldState> implements F
         newValue = normalize(newValue, value, getFieldsValue(true));
       }
 
-      // 修改值
+      // 修改值，经过 FormStore 一系列赋值后最终会通知当前 Field 刷新界面
       dispatch({
         type: 'updateValue',
         namePath,
